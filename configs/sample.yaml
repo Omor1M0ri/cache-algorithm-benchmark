@@ -1,0 +1,25 @@
+# Smoke-test configuration: runs in < 1 second on data/sample/.
+experiment:
+  policies: [lru, lfu]
+  cache_sizes: [2, 3]
+  warmup_fraction: 0.0
+  seeds: [0]
+
+workload:
+  source: file
+  path: data/sample/sample_requests.csv
+  max_requests: 10
+
+backend:
+  type: simulated
+  hit_ms: 0.05
+  miss_ms: 5.0
+
+hypothesis:
+  primary_alpha: 1.0
+  primary_cache_size: 100
+  min_rel_gain_pct: 15.0
+  max_rel_gain_pct: 20.0
+
+output:
+  dir: results/sample

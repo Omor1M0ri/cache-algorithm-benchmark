@@ -1,0 +1,26 @@
+# Full experiment configuration (Week 7 data collection).
+experiment:
+  policies: [lru, lfu]          # independent variable 1: eviction strategy
+  cache_sizes: [100, 500, 1000] # independent variable 2: capacity in items (1%, 5%, 10% of keyspace)
+  seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  # replications; same trace for both policies (paired design)
+  warmup_fraction: 0.2          # first 20% of requests fill the cache and are not measured
+
+workload:
+  source: synthetic             # synthetic | file
+  n_keys: 10000                 # controlled: size of the key space
+  n_requests: 100000            # controlled: requests per run
+  zipf_alphas: [0.0, 0.6, 0.8, 1.0, 1.2]  # independent variable 3: skew (0.0 = uniform control)
+
+backend:
+  type: simulated               # simulated | sqlite
+  hit_ms: 0.05                  # modelled cache lookup latency
+  miss_ms: 5.0                  # modelled database round-trip latency
+
+hypothesis:
+  primary_alpha: 1.0            # "pronounced hits" condition
+  primary_cache_size: 100
+  min_rel_gain_pct: 15.0        # H1 lower bound (relative gain of LFU over LRU)
+  max_rel_gain_pct: 20.0
+
+output:
+  dir: results/full
