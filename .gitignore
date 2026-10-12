@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs and temporary files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Large / binary data and model weights
+data/raw/
+data/processed/
+*.parquet
+*.h5
+*.pkl
+*.pt
+*.pth
+*.onnx
+*.bin
+*.db
+*.sqlite
+
+# Secrets
+.env
+*.key
+*.pem
+
+# IDE
+.idea/
+.vscode/
+
+# Generated sample output (full-run results ARE tracked)
+results/sample/
