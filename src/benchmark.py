@@ -120,3 +120,71 @@ def evaluate_hypothesis(summary: list[dict], cfg: dict) -> dict:
         "H0_rejected": bool(lo_ci >= h["min_rel_gain_pct"]),
         "note": "H0 is rejected only if the lower 95% CI bound is >= the minimum gain threshold.",
     }
+
+
+# ---------------------------------------------------------------------------
+# Task 3: raw per-window logging with real wall-clock timing
+# ---------------------------------------------------------------------------
+import time as _time
+
+POLICY_IDX = {"lru": 0, "lfu": 1}
+
+
+def run_logged(trace: np.ndarray, policy: str, cache_size: int, backend_cfg: dict,
+               n_keys: int, warmup_fraction: float, alpha: float, seed: int,
+               window: int = 5000, sample_per_window: int = 100) -> list[dict]:
+    """Replay `trace` and return one raw record per window of `window` requests.
+
+    Every request is timed with time.perf_counter() (cache lookup + DB fetch on a
+    miss). Windows that start before ``warmup_fraction * len(trace)`` are tagged
+    ``phase="warmup"`` (cold cache) and must be dropped during analysis.
+
+    Each response is validated against the expected payload; an exception or a
+    wrong value counts as an error (guardrail metric, must stay at 0).
+    """
+    cache = make_cache(policy, cache_size)
+    backend = make_backend(backend_cfg, n_keys)
+    warmup = int(len(trace) * warmup_fraction)
+    run_id = f"a{alpha:.1f}_c{cache_size}_{policy}_s{seed}"
+    rng = np.random.default_rng([seed, int(round(alpha * 10)), cache_size, POLICY_IDX.get(policy, 9)])
+    perf = _time.perf_counter
+    keys = trace.tolist()
+    records: list[dict] = []
+
+    for w_idx, start in enumerate(range(0, len(keys), window)):
+        chunk = keys[start:start + window]
+        lat = np.empty(len(chunk))
+        hits = errors = 0
+        w0 = perf()
+        for j, key in enumerate(chunk):
+            t0 = perf()
+            try:
+                value = cache.get(key)
+                if value is not None:
+                    hits += 1
+                else:
+                    value, _ = backend.fetch(key)
+                    cache.put(key, value)
+                ok = value == f"payload-{key}"
+            except Exception:  # noqa: BLE001 - any failure is a guardrail error
+                ok = False
+            lat[j] = (perf() - t0) * 1000.0
+            if not ok:
+                errors += 1
+        wall = perf() - w0
+        sample = rng.choice(lat, size=min(sample_per_window, len(lat)), replace=False)
+        p50, p95, p99 = np.percentile(lat, [50, 95, 99])
+        records.append({
+            "record": "window", "run_id": run_id, "policy": policy,
+            "cache_size": cache_size, "alpha": alpha, "seed": seed,
+            "window": w_idx, "req_start": start,
+            "phase": "warmup" if start < warmup else "benchmark",
+            "n": len(chunk), "hits": hits, "errors": errors,
+            "cache_len": len(cache), "capacity_ok": len(cache) <= cache_size,
+            "lat_sum_ms": round(float(lat.sum()), 6),
+            "lat_p50_ms": round(float(p50), 6), "lat_p95_ms": round(float(p95), 6),
+            "lat_p99_ms": round(float(p99), 6), "lat_max_ms": round(float(lat.max()), 6),
+            "wall_s": round(wall, 6),
+            "lat_sample_ms": [round(float(x), 5) for x in sample],
+        })
+    return records

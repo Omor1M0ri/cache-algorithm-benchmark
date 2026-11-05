@@ -1,0 +1,28 @@
+# Task 3 data collection (Weeks 7-8): raw per-window log with real timing.
+# Same factorial grid as config.yaml, but the backend is a real in-memory SQLite
+# database and every request is timed with time.perf_counter().
+experiment:
+  policies: [lru, lfu]                 # baseline = LRU, proposed = LFU
+  cache_sizes: [100, 500, 1000]        # 1 %, 5 %, 10 % of the key space
+  seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  warmup_fraction: 0.2                 # first 20 % of requests = cold-cache warm-up
+
+workload:
+  source: synthetic
+  n_keys: 10000
+  n_requests: 100000
+  zipf_alphas: [0.0, 0.6, 0.8, 1.0, 1.2]
+
+backend:
+  type: sqlite                         # real DB lookups (SELECT by primary key)
+
+raw_log:
+  path: data/raw/test_run.jsonl
+  window: 5000                         # requests per raw record -> 20 records per run
+  sample_per_window: 100               # random per-request latencies kept per window
+
+hypothesis:
+  primary_alpha: 1.0
+  primary_cache_size: 100
+  min_rel_gain_pct: 15.0
+  max_rel_gain_pct: 20.0
